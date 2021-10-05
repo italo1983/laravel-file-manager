@@ -268,20 +268,10 @@ class FileManager
      */
     public function rename($disk, $newName, $oldName, $type)
     {
-        if($type == "dir") {
 
-            if (Storage::disk($disk)->has($oldName)) {
-                $folderContents = Storage::disk($disk)->listContents($oldName, true);
-                foreach ($folderContents as $content) {
-                    if ($content['type'] === 'file') {
-                        $src  = $content['path'];
-                        $dest = str_replace($oldName, $newName, $content['path']);
-                        Storage::disk($disk)->move($src, $dest);
-                    }
-                }
-                Storage::disk($disk)->deleteDirectory($oldName);
-            }
-        }else {
+        if($type == "dir") {
+            $this->moveContent($disk, $oldName, $newName, $type);
+        } else {
             Storage::disk($disk)->move($oldName, $newName);
         }
         
@@ -291,6 +281,36 @@ class FileManager
                 'message' => 'renamed',
             ],
         ];
+    }
+
+
+    private function moveContent($disk, $oldName, $newName){
+        if (Storage::disk($disk)->has($oldName) && !Storage::disk($disk)->has($newName)) {
+            $folderContents = Storage::disk($disk)->listContents($oldName, true);
+            if(!empty($folderContents)){
+                foreach ($folderContents as $content) {
+                    $src  = $content['path'];
+                    $dest = str_replace($oldName, $newName, '/'.$content['path']);
+                    if ($content['type'] === 'file') {
+                        if(Storage::disk($disk)->has($src)){
+                            Storage::disk($disk)->move($src, $dest);
+                        } else {
+                            return;
+                        }
+                    } else {
+                        if(Storage::disk($disk)->has($src)){
+                            $this->moveContent($disk, $src, $dest);
+                            Storage::disk($disk)->deleteDirectory($oldName);
+                        } else {
+                            return;
+                        }
+                    }
+                }
+            } else {
+                Storage::disk($disk)->makeDirectory($newName);
+                Storage::disk($disk)->deleteDirectory($oldName);
+            }
+        }
     }
 
     /**
